@@ -59,7 +59,7 @@ void deleteNode(treeNode* node)
 __host__ __device__ CUDA_Vector<uint32_t> GetAllCaptures(CUDA_Queue<uint32_t> captureQueue, uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces)
 {
 	CUDA_Vector<uint32_t> fullCaptures;
-	uint32_t freeTiles, it, capturedPawn;
+	uint32_t  it, capturedPawn;
 	bool furtherCaptures;
 
 	while (!captureQueue.empty())
