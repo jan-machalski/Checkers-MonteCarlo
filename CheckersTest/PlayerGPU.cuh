@@ -7,9 +7,14 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#define THREADS_PER_BLOCK 512 
-#define BLOCKS 8
+#define THREADS_PER_BLOCK 256 
+#define BLOCKS 4
 #define XORSHIFT(seed) (seed ^= (seed << 13), seed ^= (seed >> 17), seed ^= (seed << 5))
+#define XORSHIFT_LCG(seed) \
+    (seed ^= (seed << 13), \
+     seed ^= (seed >> 17), \
+     seed ^= (seed << 5),  \
+     seed = 1664525 * seed + 1013904223)
 
 __global__ void SimulateFromNodeKernel(uint32_t playerPieces, uint32_t oppoentPieces, uint32_t promotedPieces, uint8_t nonAdvancingMoves, uint8_t* results, unsigned int seed)
 {
@@ -38,7 +43,7 @@ __global__ void SimulateFromNodeKernel(uint32_t playerPieces, uint32_t oppoentPi
 			return;
 		}
 
-		moveNum = XORSHIFT(localSeed) % availableMoves.size();
+		moveNum = XORSHIFT_LCG(localSeed) % availableMoves.size();
 		move = availableMoves.at(moveNum);
 		if (MakeMove(playerPieces, oppoentPieces, promotedPieces, move))
 			nonAdvancingMoves = 0;
@@ -63,7 +68,7 @@ __global__ void SimulateFromNodeKernel(uint32_t playerPieces, uint32_t oppoentPi
 			return;
 		}
 
-		moveNum = XORSHIFT(localSeed) % availableMoves.size();
+		moveNum = XORSHIFT_LCG(localSeed) % availableMoves.size();
 		move = availableMoves.at(moveNum);
 
 		if (MakeMove(oppoentPieces, playerPieces, promotedPieces, move))

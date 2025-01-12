@@ -2,6 +2,7 @@
 #include<stdlib.h>
 #include<vector>
 #include<queue>
+#include<utility>
 #include<cstdlib>
 
 #include"containers.hpp"
@@ -498,4 +499,317 @@ uint8_t SimulateFromNode(uint32_t playerPieces, uint32_t oppoentPieces, uint32_t
 	}
 }
 
+uint32_t reverseBits(uint32_t n)
+{
+	uint32_t reversed = 0;
+
+	for (int i = 0; i < 32; ++i)
+	{
+		reversed <<= 1;
+		reversed |= (n & 1);
+		n >>= 1;
+	}
+	return reversed;
+}
+
+CUDA_Vector<std::pair<uint32_t,std::string>> GetAllCapturesWithNotation(CUDA_Queue<std::pair<uint32_t, std::string>> captureQueue, uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces,bool whiteToPlay)
+{
+	CUDA_Vector<std::pair<uint32_t, std::string>> fullCaptures;
+	uint32_t  it, capturedPawn;
+	bool furtherCaptures;
+
+	while (!captureQueue.empty())
+	{
+		furtherCaptures = false;
+		uint32_t currentCapture = captureQueue.front().first;
+		std::string notation = captureQueue.front().second;
+		captureQueue.pop();
+		uint32_t capturableOpponentPieces = opponentPieces & ~(currentCapture);
+		uint32_t currentPos = (currentCapture & (~(playerPieces | opponentPieces))) ? (currentCapture & (~(playerPieces | opponentPieces))) : currentCapture & (~opponentPieces);
+		uint32_t freeTiles = (~(playerPieces | opponentPieces) | (playerPieces & currentCapture)) & (~currentPos);
+
+		if (promotedPieces & playerPieces & currentCapture)
+		{
+			// capture right and up
+			it = (MINUS3_AVAILABLE & currentPos) ? currentPos >> 3 : (currentPos & DIAGONAL_RIGHT_END ? 0 : currentPos >> 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if ((it & freeTiles) && capturedPawn)
+				{
+					furtherCaptures = true;
+					captureQueue.push(std::make_pair((currentCapture & playerPieces) | (opponentPieces & currentCapture) | capturedPawn | it,notation+":" + (whiteToPlay ? boardMap.at(it) : boardMapReverse.at(it))));
+				}
+				else if (it & capturableOpponentPieces && !capturedPawn)
+					capturedPawn = it;
+				else if (!(it & freeTiles))
+					break;
+				it = (MINUS3_AVAILABLE & it) ? it >> 3 : (it & DIAGONAL_RIGHT_END ? 0 : it >> 4);
+			}
+
+			// capture left and up
+			it = (MINUS5_AVAILABLE & currentPos) ? currentPos >> 5 : (currentPos & DIAGONAL_LEFT_END ? 0 : currentPos >> 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (it & freeTiles && capturedPawn)
+				{
+					furtherCaptures = true;
+					captureQueue.push(std::make_pair((currentCapture & playerPieces) | (opponentPieces & currentCapture) | capturedPawn | it,notation+":"+ (whiteToPlay ? boardMap.at(it) : boardMapReverse.at(it))));
+				}
+				else if (it & capturableOpponentPieces && !capturedPawn)
+					capturedPawn = it;
+				else if (!(it & freeTiles))
+					break;
+				it = (MINUS5_AVAILABLE & it) ? it >> 5 : (it & DIAGONAL_LEFT_END ? 0 : it >> 4);
+			}
+
+			// captures right and down
+			it = (PLUS5_AVAILABLE & currentPos) ? currentPos << 5 : (currentPos & DIAGONAL_RIGHT_END ? 0 : currentPos << 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (it & freeTiles && capturedPawn)
+				{
+					furtherCaptures = true;
+					captureQueue.push(std::make_pair((currentCapture & playerPieces) | (opponentPieces & currentCapture) | capturedPawn | it,notation+":"+ (whiteToPlay ? boardMap.at(it) : boardMapReverse.at(it))));
+				}
+				else if (it & capturableOpponentPieces && !capturedPawn)
+					capturedPawn = it;
+				else if (!(it & freeTiles))
+					break;
+				it = (PLUS5_AVAILABLE & it) ? it << 5 : (it & DIAGONAL_RIGHT_END ? 0 : it << 4);
+			}
+
+			// captures left and down
+			it = (PLUS3_AVAILABLE & currentPos) ? currentPos << 3 : (currentPos & DIAGONAL_LEFT_END ? 0 : currentPos << 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (it & freeTiles && capturedPawn)
+				{
+					furtherCaptures = true;
+					captureQueue.push(std::make_pair((currentCapture & playerPieces) | (opponentPieces & currentCapture) | capturedPawn | it,notation+":"+ (whiteToPlay ? boardMap.at(it) : boardMapReverse.at(it))));
+				}
+				else if (it & capturableOpponentPieces && !capturedPawn)
+					capturedPawn = it;
+				else if (!(it & freeTiles))
+					break;
+				it = (PLUS3_AVAILABLE & it) ? it << 3 : (it & DIAGONAL_LEFT_END ? 0 : it << 4);
+			}
+		}
+		else
+		{
+			// right up capture
+			if (currentPos & RIGHT_UP_CAPTURE_AVAILABLE)
+			{
+				if (MINUS3_AVAILABLE & currentPos && MINUS4_AVAILABLE & (currentPos >> 3) && capturableOpponentPieces & (currentPos >> 3) && freeTiles & (currentPos >> 7))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos >> 3) | (currentPos >> 7);
+					captureQueue.push(std::make_pair(newCapture,notation+":"+(whiteToPlay ? boardMap.at(currentPos >> 7) : boardMapReverse.at(currentPos >> 7))));
+				}
+				else if (MINUS4_AVAILABLE & currentPos && MINUS3_AVAILABLE & (currentPos >> 4) && capturableOpponentPieces & (currentPos >> 4) && freeTiles & (currentPos >> 7))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos >> 4) | (currentPos >> 7);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos >> 7) : boardMapReverse.at(currentPos >> 7))));
+				}
+			}
+			// up left capture
+			if (currentPos & LEFT_UP_CAPTURE_AVAILABLE)
+			{
+				if (MINUS5_AVAILABLE & currentPos && MINUS4_AVAILABLE & (currentPos >> 5) && capturableOpponentPieces & (currentPos >> 5) && freeTiles & (currentPos >> 9))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos >> 5) | (currentPos >> 9);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos >> 9) : boardMapReverse.at(currentPos >> 9))));
+				}
+				else if (MINUS4_AVAILABLE & currentPos && MINUS5_AVAILABLE & (currentPos >> 4) && capturableOpponentPieces & (currentPos >> 4) && freeTiles & (currentPos >> 9))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos >> 4) | (currentPos >> 9);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos >> 9) : boardMapReverse.at(currentPos >> 9))));
+				}
+			}
+			// down right capture
+			if (currentPos & RIGHT_DOWN_CAPTURE_AVAILABLE)
+			{
+				if (PLUS5_AVAILABLE & currentPos && PLUS4_AVAILABLE & (currentPos << 5) && capturableOpponentPieces & (currentPos << 5) && freeTiles & (currentPos << 9))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos << 5) | (currentPos << 9);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos << 9) : boardMapReverse.at(currentPos << 9))));
+				}
+				else if (PLUS4_AVAILABLE & currentPos && PLUS5_AVAILABLE & (currentPos << 4) && capturableOpponentPieces & (currentPos << 4) && freeTiles & (currentPos << 9))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos << 4) | (currentPos << 9);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos << 9) : boardMapReverse.at(currentPos << 9))));
+				}
+			}
+			// down left capture
+			if (currentPos & LEFT_DOWN_CAPTURE_AVAILABLE)
+			{
+				if (PLUS3_AVAILABLE & currentPos && PLUS4_AVAILABLE & (currentPos << 3) && capturableOpponentPieces & (currentPos << 3) && freeTiles & (currentPos << 7))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos << 3) | (currentPos << 7);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos << 7) : boardMapReverse.at(currentPos << 7))));
+				}
+				else if (PLUS4_AVAILABLE & currentPos && PLUS3_AVAILABLE & (currentPos << 4) && capturableOpponentPieces & (currentPos << 4) && freeTiles & (currentPos << 7))
+				{
+					furtherCaptures = true;
+					uint32_t newCapture = (currentCapture & playerPieces) | (opponentPieces & currentCapture) | (currentPos << 4) | (currentPos << 7);
+					captureQueue.push(std::make_pair(newCapture, notation + ":" + (whiteToPlay ? boardMap.at(currentPos << 7) : boardMapReverse.at(currentPos << 7))));
+				}
+			}
+
+		}
+		if (!furtherCaptures)
+			fullCaptures.push_back(std::make_pair(currentCapture,notation));
+	}
+
+	return fullCaptures;
+}
+
+bool AddMoveOfPromotedFigureWithNotation(const uint32_t pos, uint32_t& it, uint32_t& capturedPawn, const uint32_t freeTiles, const uint32_t opponentPieces,std::string notation, CUDA_Vector<std::pair<uint32_t,std::string>>& movesWithoutCapture, CUDA_Queue<std::pair<uint32_t, std::string>>& captureQueue,bool whiteToPlay)
+{
+	if (it & freeTiles)
+	{
+		if (capturedPawn)
+			captureQueue.push(std::make_pair(pos | capturedPawn | it,notation+":"+(whiteToPlay ? boardMap.at(it):boardMapReverse.at(it))));
+		else
+			movesWithoutCapture.push_back(std::make_pair(pos | it,notation+"-"+(whiteToPlay ? boardMap.at(it) : boardMapReverse.at(it))));
+	}
+	else
+	{
+		if (it & opponentPieces && !capturedPawn)
+			capturedPawn = it;
+		else
+			return false;
+	}
+	return true;
+}
+
+CUDA_Vector<std::pair<uint32_t,std::string>> GeneratePossibleMovesWithNotation(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces,bool whiteToPlay)
+{
+	CUDA_Vector<std::pair<uint32_t, std::string>> movesWithoutCapture;
+	CUDA_Queue<std::pair<uint32_t, std::string>> captureQueue;
+	uint32_t freeTiles = ~(playerPieces | opponentPieces);
+	uint32_t it, capturedPawn;
+
+	for (uint32_t pos = 1; pos != 0; pos <<= 1)
+	{
+		if (!(playerPieces & pos)) continue;
+
+		if (promotedPieces & pos)
+		{
+			// moves and captures right and up
+			it = (MINUS3_AVAILABLE & pos) ? pos >> 3 : (pos & DIAGONAL_RIGHT_END ? 0 : pos >> 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (!AddMoveOfPromotedFigureWithNotation(pos, it, capturedPawn, freeTiles, opponentPieces, (whiteToPlay ? boardMap.at(pos) : boardMapReverse.at(pos)), movesWithoutCapture, captureQueue,whiteToPlay)) break;
+				it = (MINUS3_AVAILABLE & it) ? it >> 3 : (it & DIAGONAL_RIGHT_END ? 0 : it >> 4);
+			}
+
+			// moves and captures left and up
+			it = (MINUS5_AVAILABLE & pos) ? pos >> 5 : (pos & DIAGONAL_LEFT_END ? 0 : pos >> 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (!AddMoveOfPromotedFigureWithNotation(pos, it, capturedPawn, freeTiles, opponentPieces, (whiteToPlay ? boardMap.at(pos) : boardMapReverse.at(pos)), movesWithoutCapture, captureQueue, whiteToPlay)) break;
+				it = (MINUS5_AVAILABLE & it) ? it >> 5 : (it & DIAGONAL_LEFT_END ? 0 : it >> 4);
+			}
+
+			// moves and captures right and down
+			it = (PLUS5_AVAILABLE & pos) ? pos << 5 : (pos & DIAGONAL_RIGHT_END ? 0 : pos << 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (!AddMoveOfPromotedFigureWithNotation(pos, it, capturedPawn, freeTiles, opponentPieces, (whiteToPlay ? boardMap.at(pos) : boardMapReverse.at(pos)), movesWithoutCapture, captureQueue, whiteToPlay)) break;
+				it = (PLUS5_AVAILABLE & it) ? it << 5 : (it & DIAGONAL_RIGHT_END ? 0 : it << 4);
+			}
+
+			// moves and captures left and down
+			it = (PLUS3_AVAILABLE & pos) ? pos << 3 : (pos & DIAGONAL_LEFT_END ? 0 : pos << 4);
+			capturedPawn = 0;
+			while (it)
+			{
+				if (!AddMoveOfPromotedFigureWithNotation(pos, it, capturedPawn, freeTiles, opponentPieces, (whiteToPlay ? boardMap.at(pos) : boardMapReverse.at(pos)), movesWithoutCapture, captureQueue, whiteToPlay)) break;
+				it = (PLUS3_AVAILABLE & it) ? it << 3 : (it & DIAGONAL_LEFT_END ? 0 : it << 4);
+			}
+
+		}
+		else
+		{
+			std::string notation = whiteToPlay ? boardMap.at(pos) : boardMapReverse.at(pos);
+			// move or capture up where the field above has index smaller by 4
+			if (pos >> 4)
+			{
+				// move without capture
+				if (freeTiles & (pos >> 4))
+				{
+					movesWithoutCapture.push_back(std::make_pair(pos | (pos >> 4),notation+"-"+(whiteToPlay?boardMap.at(pos>>4):boardMapReverse.at(pos>>4))));
+				}
+				// capture right up 
+				else if (MINUS3_AVAILABLE & (pos >> 4) && opponentPieces & (pos >> 4) && freeTiles & (pos >> 7))
+				{
+					captureQueue.push(std::make_pair(pos | (pos >> 4) | (pos >> 7),notation+":"+(whiteToPlay?boardMap.at(pos>>7):boardMapReverse.at(pos>>7))));
+				}
+				// capture left up
+				else if (MINUS5_AVAILABLE & (pos >> 4) && opponentPieces & (pos >> 4) && freeTiles & (pos >> 9))
+				{
+					captureQueue.push(std::make_pair(pos | (pos >> 4) | (pos >> 9),notation+":"+(whiteToPlay ? boardMap.at(pos >> 9) : boardMapReverse.at(pos >> 9))));
+				}
+			}
+			// move or capture right up if the left up field has index smaller by 3
+			if (pos & MINUS3_AVAILABLE)
+			{
+				if (freeTiles & (pos >> 3))
+				{
+					movesWithoutCapture.push_back(std::make_pair(pos | (pos >> 3),notation+"-"+(whiteToPlay?boardMap.at(pos>>3):boardMapReverse.at(pos>>3))));
+				}
+				else if (opponentPieces & (pos >> 3) && freeTiles & (pos >> 7))
+				{
+					captureQueue.push(std::make_pair(pos | (pos >> 3) | pos >> 7,notation+":"+(whiteToPlay?boardMap.at(pos>>7):boardMapReverse.at(pos>>7))));
+				}
+			}
+			// move or capture left up if the left up field has index smaller by 5
+			if (pos & MINUS5_AVAILABLE)
+			{
+				if (freeTiles & (pos >> 5))
+				{
+					movesWithoutCapture.push_back(std::make_pair(pos | (pos >> 5),notation+"-"+(whiteToPlay?boardMap.at(pos>>5):boardMapReverse.at(pos>>5))));
+				}
+				else if (opponentPieces & (pos >> 5) && freeTiles & (pos >> 9))
+				{
+					captureQueue.push(std::make_pair(pos | (pos >> 5) | (pos >> 9),notation+":"+ (whiteToPlay ? boardMap.at(pos >> 9) : boardMapReverse.at(pos >> 9))));
+				}
+			}
+			// captures down
+			if (pos & PLUS5_AVAILABLE && opponentPieces & (pos << 5) && freeTiles & (pos << 9))
+			{
+				captureQueue.push(std::make_pair(pos | (pos << 5) | (pos << 9), notation + ":" + (whiteToPlay ? boardMap.at(pos << 9) : boardMapReverse.at(pos << 9))));
+			}
+			if (PLUS3_AVAILABLE & pos && opponentPieces & (pos << 3) && freeTiles & (pos << 7))
+			{
+				captureQueue.push(std::make_pair(pos | (pos << 3) | (pos << 7), notation + ":" + (whiteToPlay ? boardMap.at(pos << 7) : boardMapReverse.at(pos << 7))));
+			}
+			if (PLUS5_AVAILABLE & (pos << 4) && opponentPieces & (pos << 4) && freeTiles & (pos << 9))
+			{
+				captureQueue.push(std::make_pair(pos | (pos << 4) | (pos << 9), notation + ":" + (whiteToPlay ? boardMap.at(pos << 9) : boardMapReverse.at(pos << 9))));
+			}
+			if (PLUS3_AVAILABLE & (pos << 4) && opponentPieces & (pos << 4) && freeTiles & (pos << 7))
+			{
+				captureQueue.push(std::make_pair(pos | (pos << 4) | (pos << 7), notation + ":" + (whiteToPlay ? boardMap.at(pos << 7) : boardMapReverse.at(pos << 7))));
+			}
+		}
+	}
+	if (captureQueue.empty())
+		return movesWithoutCapture;
+	return GetAllCapturesWithNotation(captureQueue, playerPieces, opponentPieces, promotedPieces,whiteToPlay);
+
+}
 

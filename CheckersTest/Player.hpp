@@ -104,6 +104,23 @@ public:
 				bestChild = c;
 			}
 		}
+		CUDA_Vector<std::pair<uint32_t, std::string>> availableMoves = GeneratePossibleMovesWithNotation(root->playerPieces, root->opponentPieces, root->promotedPieces, isWhite);
+		uint32_t newPlayerPieces = reverseBits(bestChild->opponentPieces);
+		uint32_t newOpponentPieces = reverseBits(bestChild->playerPieces);
+		uint32_t newPromotedPieces = reverseBits(bestChild->promotedPieces);
+		for (auto move : availableMoves)
+		{
+			uint32_t playerTmp = root->playerPieces;
+			uint32_t opponentTmp = root->opponentPieces;
+			uint32_t promotedTmp = root->promotedPieces;
+			MakeMove(playerTmp, opponentTmp, promotedTmp, move.first);
+			if (playerTmp == newPlayerPieces && opponentTmp == newOpponentPieces && promotedTmp == newPromotedPieces)
+			{
+				std::cout << move.second << std::endl;
+				break;
+			}
+		}
+
 		UpdateRoot(bestChild->playerPieces, bestChild->opponentPieces, bestChild->promotedPieces);
 		return true;
 

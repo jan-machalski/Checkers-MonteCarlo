@@ -1,17 +1,6 @@
 ﻿#include "PlayerGPU.cuh"
 
-uint32_t reverseBits(uint32_t n)
-{
-	uint32_t reversed = 0;
-
-	for (int i = 0; i < 32; ++i)
-	{
-		reversed <<= 1;
-		reversed |= (n & 1);
-		n >>= 1;
-	}
-	return reversed;
-}
+using namespace std;
 
 uint32_t InputMove(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces, bool reverseBoard = false)
 {
@@ -144,6 +133,7 @@ std::unique_ptr<Player> selectPlayerMode(bool isWhite) {
 	}
 }
 
+
 void PrintMoveInfo(uint32_t move)
 {
 	for (int i = 0; i < 32; i++)
@@ -165,28 +155,32 @@ void UpdateBoard(treeNode* root, uint32_t& playerPieces, uint32_t& opponentPiece
 int main()
 {
 	srand(time(NULL));
-	/*uint8_t result = simulateFromNode(0xFFF00000, 0x00000FFF, 0, 0);
-	cout << result;*/
-	/*uint32_t pl = 0;
+
+	uint32_t pl = 0;
 	uint32_t opp = 0;
 	uint32_t prom = 0;
-	SET_BIT(pl, 2, 1);
-	SET_BIT(pl, 15, 1);
-	SET_BIT(prom, 2, 1);
+	SET_BIT(pl, 0, 1);
+	SET_BIT(pl, 3, 1);
+	//SET_BIT(prom, 0, 1);
+	//SET_BIT(prom, 3, 1);
 
-	SET_BIT(opp, 13, 1);
-	SET_BIT(opp, 25, 1);
+	SET_BIT(opp, 7, 1);
+	SET_BIT(opp, 15, 1);
+	SET_BIT(opp, 14, 1);
+	SET_BIT(opp, 22, 1);
+	SET_BIT(opp, 23, 1);
+	SET_BIT(opp, 21, 1);
 
-	vector<uint32_t> moves = GeneratePossibleMoves(pl, opp, prom);
-	printBoard(pl, opp, prom, false);
-	PrintMoveInfo(InputMove(pl, opp, prom, true));
+	CUDA_Vector<pair<uint32_t,string>> moves = GeneratePossibleMovesWithNotation(pl, opp, prom,true);
+	printBoard(pl, opp, prom, true);
 	for (auto m : moves)
 	{
-		for (int i = 0; i < 32; i++)
-			if (BIT(m, i))
+		cout << m.second << std::endl;
+		/*for (int i = 0; i < 32; i++)
+			if (BIT(m.first, i))
 				cout << i << " ";
-		cout << endl;
-	}*/
+		cout << std::endl;*/
+	}
 	/*treeNode* root = new treeNode();
 	GenerateChildren(root);
 	for (auto c : root->children)
@@ -242,7 +236,7 @@ int main()
 
 	}*/
 
-	uint32_t whitePieces = PLAYER_PIECES_INIT;
+	/*uint32_t whitePieces = PLAYER_PIECES_INIT;
 	uint32_t blackPieces = OPPONENT_PIECES_INIT;
 	uint32_t promotedPieces = 0;
 	uint32_t whitePiecesOpposite = OPPONENT_PIECES_INIT;
@@ -275,12 +269,7 @@ int main()
 			}
 			nonAdvancingMoveCounter = whitePlayer->root->nonAdvancingMoves;
 			std::cout << "Non advancing moves: " << nonAdvancingMoveCounter << std::endl;
-			if (nonAdvancingMoveCounter >= 10)
-			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
-			}
-			;
+
 			UpdateBoard(whitePlayer->root, blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, blackPieces, whitePieces, promotedPieces);
 
 			if (blackPlayer)
@@ -291,6 +280,11 @@ int main()
 			else
 			{
 				printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
+			}
+			if (nonAdvancingMoveCounter >= 10)
+			{
+				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
+				break;
 			}
 		}
 		else
@@ -338,11 +332,7 @@ int main()
 			}
 			nonAdvancingMoveCounter = blackPlayer->root->nonAdvancingMoves;
 			std::cout << "Non advancing moves: " << nonAdvancingMoveCounter << std::endl;
-			if (nonAdvancingMoveCounter >= 10)
-			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
-			}
+
 			UpdateBoard(blackPlayer->root, whitePieces, blackPieces, promotedPieces, whitePiecesOpposite, blackPiecesOpposite, promotedPiecesOpposite);
 			if (whitePlayer)
 			{
@@ -352,6 +342,11 @@ int main()
 			else
 			{
 				printBoard(whitePieces, blackPieces, promotedPieces);
+			}
+			if (nonAdvancingMoveCounter >= 10)
+			{
+				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
+				break;
 			}
 		}
 		else
@@ -387,7 +382,7 @@ int main()
 				whitePlayer->UpdateRoot(whitePieces, blackPieces, promotedPieces);
 		}
 
-	}
+	}*/
 
 	return 0;
 }
