@@ -4,6 +4,8 @@
 
 #include "tree.hpp"
 
+//#define SHOW_EVALUATIONS 
+
 class Player
 {
 public:
@@ -36,7 +38,6 @@ public:
 					break;
 				}
 
-				//double score = child->playerForTheWin ? child->totalPoints : (2 * child->gamesPlayed - child->totalPoints);
 				double score = 2 * child->gamesPlayed - child->totalPoints;
 				score = score / 2 / child->gamesPlayed + sqrt(2 * log(p->gamesPlayed) / child->gamesPlayed);
 				if (score >= bestScore)
@@ -108,18 +109,35 @@ public:
 		uint32_t newPlayerPieces = reverseBits(bestChild->opponentPieces);
 		uint32_t newOpponentPieces = reverseBits(bestChild->playerPieces);
 		uint32_t newPromotedPieces = reverseBits(bestChild->promotedPieces);
+		bool found = false;
+		std::string bestMove;
 		for (auto move : availableMoves)
 		{
 			uint32_t playerTmp = root->playerPieces;
 			uint32_t opponentTmp = root->opponentPieces;
 			uint32_t promotedTmp = root->promotedPieces;
 			MakeMove(playerTmp, opponentTmp, promotedTmp, move.first);
-			if (playerTmp == newPlayerPieces && opponentTmp == newOpponentPieces && promotedTmp == newPromotedPieces)
+#ifdef SHOW_EVALUATIONS
+			std::cout << "Available moves and their evaluations:" << std::endl;
+			for (auto c : root->children)
 			{
-				std::cout << move.second << std::endl;
-				break;
+				uint32_t playerTmp2 = reverseBits(c->opponentPieces);
+				uint32_t opponentTmp2 = reverseBits(c->playerPieces);
+				uint32_t promotedTmp2 = reverseBits(c->promotedPieces);
+				if (playerTmp == playerTmp2 && opponentTmp == opponentTmp2 && promotedTmp == promotedTmp2)
+				{
+					std::cout << move.second <<" Evaluation: "<< - ((double)c->totalPoints / c->gamesPlayed - 1) << " Simulations: "<<c->gamesPlayed<<std::endl;
+					break;
+				}
+			}
+#endif
+			if (playerTmp == newPlayerPieces && opponentTmp == newOpponentPieces && promotedTmp == newPromotedPieces && !found)
+			{
+				bestMove = move.second;
+				found = true;
 			}
 		}
+		std::cout << "Move: " << bestMove << std::endl;
 
 		UpdateRoot(bestChild->playerPieces, bestChild->opponentPieces, bestChild->promotedPieces);
 		return true;

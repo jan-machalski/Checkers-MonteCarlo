@@ -1,6 +1,6 @@
 ﻿#include "PlayerGPU.cuh"
 
-using namespace std;
+//using namespace std;
 
 uint32_t InputMove(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces, bool reverseBoard = false)
 {
@@ -156,31 +156,44 @@ int main()
 {
 	srand(time(NULL));
 
-	uint32_t pl = 0;
+	/*uint32_t pl = 0;
 	uint32_t opp = 0;
 	uint32_t prom = 0;
-	SET_BIT(pl, 0, 1);
-	SET_BIT(pl, 3, 1);
-	//SET_BIT(prom, 0, 1);
-	//SET_BIT(prom, 3, 1);
+	SET_BIT(pl, 4, 1);
+	SET_BIT(pl, 12, 1);
+	SET_BIT(pl, 18, 1);
+	SET_BIT(pl, 19, 1);
+	SET_BIT(pl, 20, 1);
+	SET_BIT(pl, 22, 1);
+	SET_BIT(pl, 24, 1);
+	SET_BIT(pl, 26, 1);
 
-	SET_BIT(opp, 7, 1);
-	SET_BIT(opp, 15, 1);
-	SET_BIT(opp, 14, 1);
-	SET_BIT(opp, 22, 1);
-	SET_BIT(opp, 23, 1);
-	SET_BIT(opp, 21, 1);
+	SET_BIT(opp, 0, 1);
+	SET_BIT(opp, 9, 1);
+	SET_BIT(opp, 10, 1);
+	SET_BIT(opp, 11, 1);
+	SET_BIT(opp, 13, 1);
+	SET_BIT(opp, 17, 1);
+	//SET_BIT(opp, 21, 1);
+	PlayerCPU testPlayer(true, 1000, 500);
+	testPlayer.root->playerPieces = pl;
+	testPlayer.root->opponentPieces = opp;
+	testPlayer.root->promotedPieces = prom;
+	testPlayer.root->nonAdvancingMoves = 0;
+	testPlayer.MakeBestMove();
+	printBoard(testPlayer.root->playerPieces, testPlayer.root->opponentPieces, testPlayer.root->promotedPieces, false);*/
 
-	CUDA_Vector<pair<uint32_t,string>> moves = GeneratePossibleMovesWithNotation(pl, opp, prom,true);
+
+	/*CUDA_Vector<pair<uint32_t, string>> moves = GeneratePossibleMovesWithNotation(pl, opp, prom, true);
 	printBoard(pl, opp, prom, true);
 	for (auto m : moves)
 	{
 		cout << m.second << std::endl;
-		/*for (int i = 0; i < 32; i++)
-			if (BIT(m.first, i))
-				cout << i << " ";
-		cout << std::endl;*/
-	}
+		//for (int i = 0; i < 32; i++)
+			//if (BIT(m.first, i))
+				//cout << i << " ";
+		//cout << std::endl;
+	}*/
 	/*treeNode* root = new treeNode();
 	GenerateChildren(root);
 	for (auto c : root->children)
@@ -236,8 +249,9 @@ int main()
 
 	}*/
 
-	/*uint32_t whitePieces = PLAYER_PIECES_INIT;
+	uint32_t whitePieces = PLAYER_PIECES_INIT;
 	uint32_t blackPieces = OPPONENT_PIECES_INIT;
+
 	uint32_t promotedPieces = 0;
 	uint32_t whitePiecesOpposite = OPPONENT_PIECES_INIT;
 	uint32_t blackPiecesOpposite = PLAYER_PIECES_INIT;
@@ -382,7 +396,7 @@ int main()
 				whitePlayer->UpdateRoot(whitePieces, blackPieces, promotedPieces);
 		}
 
-	}*/
+	}
 
 	return 0;
 }
