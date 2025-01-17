@@ -1,7 +1,8 @@
 #include "Player.hpp"
 #include <curand_kernel.h>
 #include <curand.h>
-#include "device_functions.h"
+#include <exception>
+#include "cuda_runtime_api.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -57,7 +58,7 @@ __global__ void SimulateFromNodeKernel(
     uint8_t localResult = 0; 
 
     while (true) {
-        if (nonAdvancingMoves > 10) {
+        if (nonAdvancingMoves > MAX_NON_ADVANCING_MOVES) {
             localResult = 1;
             break;
         }
@@ -83,7 +84,7 @@ __global__ void SimulateFromNodeKernel(
             nonAdvancingMoves++;
         }
 
-        if (nonAdvancingMoves > 10) {
+        if (nonAdvancingMoves > MAX_NON_ADVANCING_MOVES) {
             localResult = 1;
             break;
         }
@@ -139,17 +140,25 @@ public:
 	PlayerGPU(bool isWhite, uint32_t timePerMove): Player(isWhite, timePerMove,THREADS_PER_BLOCK*BLOCKS),seed(time(NULL))
 	{
 		h_results = new uint8_t[THREADS_PER_BLOCK * BLOCKS];
-		cudaMalloc(&d_states, THREADS_PER_BLOCK * BLOCKS * sizeof(curandState_t));
-        cudaMalloc(&d_states, THREADS_PER_BLOCK * BLOCKS * sizeof(curandState_t));
-        cudaMalloc(&d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t));
-        cudaMalloc(&d_globalSum, sizeof(uint64_t));
-        cudaMemset(d_globalSum, 0, sizeof(uint64_t));
-        cudaDeviceSynchronize();
+        if (cudaMalloc(&d_states, THREADS_PER_BLOCK * BLOCKS * sizeof(curandState_t)) != cudaSuccess) 
+            throw std::runtime_error("Failed to allocate memory for d_states.");
+
+		if (cudaMalloc(&d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t)) != cudaSuccess)
+			throw std::runtime_error("Failed to allocate memory for d_results.");
+
+        if (cudaMalloc(&d_globalSum, sizeof(uint64_t)) != cudaSuccess) 
+            throw std::runtime_error("Failed to allocate memory for d_globalSum.");
+
+        if (cudaMemset(d_globalSum, 0, sizeof(uint64_t)) != cudaSuccess) 
+            throw std::runtime_error("Failed to initialize d_globalSum with cudaMemset.");
+
+        if (cudaDeviceSynchronize() != cudaSuccess) 
+            throw std::runtime_error("Failed to synchronize device after initialization.");
 	}
     ~PlayerGPU() {
-        cudaFree(d_states);
-        cudaFree(d_results);
-        cudaFree(d_globalSum);
+        if (d_states) cudaFree(d_states);
+        if (d_results) cudaFree(d_results);
+        if (d_globalSum) cudaFree(d_globalSum);
         delete[] h_results;
     }
 	void Simulation(treeNode* node) override {
@@ -166,12 +175,20 @@ public:
             seed,
             d_globalSum
             );
-        cudaDeviceSynchronize();
+        cudaError_t kernelErr = cudaGetLastError();
+        if (kernelErr != cudaSuccess) 
+            throw std::runtime_error(std::string("Kernel execution failed: ") + cudaGetErrorString(kernelErr));
+
+        if (cudaDeviceSynchronize() != cudaSuccess) 
+            throw std::runtime_error("Failed to synchronize device after kernel execution.");
 
         uint64_t h_globalSum = 0;
-        cudaMemcpy(&h_globalSum, d_globalSum, sizeof(uint64_t), cudaMemcpyDeviceToHost);
-
-        cudaMemcpy(h_results, d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+        if (cudaMemcpy(&h_globalSum, d_globalSum, sizeof(uint64_t), cudaMemcpyDeviceToHost) != cudaSuccess)
+            throw std::runtime_error("Failed to copy d_globalSum to host memory.");
+       
+        if (cudaMemcpy(h_results, d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t), cudaMemcpyDeviceToHost) != cudaSuccess)
+            throw std::runtime_error("Failed to copy d_results to host memory.");
+       
 
 
 		node->totalPoints += h_globalSum;

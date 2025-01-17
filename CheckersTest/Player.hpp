@@ -86,13 +86,12 @@ public:
 			BackPropagation(next);
 		}
 	}
-	bool MakeBestMove()
+	std::string MakeBestMove()
 	{
 		PerformMC();
-		std::cout << "Total simulations: " << root->gamesPlayed << std::endl;
-		std::cout << "Total points: " << root->totalPoints << std::endl;
+		printf("Total simulations from current root: %llu\n", root->gamesPlayed);
 		double evaluation = (double)root->totalPoints / root->gamesPlayed - 1;
-		std::cout << "Evaluation: "<<std::fixed<<std::setprecision(3)<< evaluation << std::endl;
+		printf("Evaluation: %.3f (value between -1 and 1, more = better situation)\n", evaluation);
 		if (root->children.size() == 0)
 			return false;
 		treeNode* bestChild = nullptr;
@@ -110,7 +109,7 @@ public:
 		uint32_t newOpponentPieces = reverseBits(bestChild->playerPieces);
 		uint32_t newPromotedPieces = reverseBits(bestChild->promotedPieces);
 		bool found = false;
-		std::string bestMove;
+		std::string bestMove = "";
 		for (auto move : availableMoves)
 		{
 			uint32_t playerTmp = root->playerPieces;
@@ -140,7 +139,7 @@ public:
 		std::cout << "Move: " << bestMove << std::endl;
 
 		UpdateRoot(bestChild->playerPieces, bestChild->opponentPieces, bestChild->promotedPieces);
-		return true;
+		return bestMove;
 
 	}
 	void UpdateRoot(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces)
@@ -166,7 +165,7 @@ public:
 			root->parent = nullptr;
 		}
 		else
-			std::cout << "INVALID MOVE ERROR" << std::endl;
+			throw std::exception("Update root error");
 	}
 
 };

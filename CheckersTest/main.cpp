@@ -1,62 +1,28 @@
-﻿#include "PlayerGPU.cuh"
+﻿#include <fstream>
 
-//using namespace std;
+#include "PlayerGPU.cuh"
 
-uint32_t InputMove(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces, bool reverseBoard = false)
+std::pair<uint32_t,std::string> InputMove(CUDA_Vector<std::pair<uint32_t,std::string>> availableMoves)
 {
-
-
-	uint32_t obstacles = playerPieces;
 	uint32_t result = 0;
 	std::string move;
-	std::cout << "Input your move" << std::endl;
-	std::cin >> move;
-	if (move.length() % 2)
-		return 0;
-	if (reverseBoard)
+	do
 	{
-		for (int i = 0; i < move.length(); i++)
+		std::string move;
+		std::cout << "Input your move (e.g a4-b5 or d2:f4:d6)" << std::endl;
+		std::cin >> move; 
+		for (auto p : availableMoves)
 		{
-			if (move[i] <= '8' && move[i] >= '1')
-				move[i] = '1' + '8' - move[i];
-			else if (move[i] <= 'h' && move[i] >= 'a')
-				move[i] = 'a' + 'h' - move[i];
-			else
-				return 0;
-		}
-	}
-	int startPos = 4 * ('8' - move[1]) + (move[0] - 'a') / 2;
-	int endPos = 4 * ('8' - move[move.length() - 1]) + (move[move.length() - 2] - 'a') / 2;
-	SET_BIT(result, startPos, 1);
-	SET_BIT(result, endPos, 1);
-	for (int i = 0; i < move.length() / 2 - 1; i++)
-	{
-		std::string s1 = move.substr(i * 2, 2);
-		std::string s2 = move.substr(i * 2 + 2, 2);
-		if ((s1[0] - 'a' + s1[1] - '1') % 2 == 1 || (s2[0] - 'a' + s2[1] - '1') % 2 == 1)
-			return 0;
-		if (abs(s1[0] - s2[0]) != abs(s1[1] - s2[1]))
-			return 0;
-		int r0 = (s2[0] - s1[0]) / abs(s2[0] - s1[0]);
-		int r1 = (s2[1] - s1[1]) / abs(s2[1] - s1[1]);
-		int pos0 = s1[0] + r0;
-		int pos1 = s1[1] + r1;
-		while (pos0 != s2[0])
-		{
-			int posNr = 4 * ('8' - pos1) + (pos0 - 'a') / 2;
-			if (BIT(obstacles, posNr))
-				return 0;
-			if (BIT(opponentPieces, posNr))
+			if (p.second == move)
 			{
-				SET_BIT(obstacles, posNr, 1);
-				SET_BIT(result, posNr, 1);
+				result = p.first;
+				break;
 			}
-
-			pos0 += r0;
-			pos1 += r1;
 		}
-	}
-	return result;
+
+	}while (result == 0);
+
+	return std::make_pair(result,move);
 
 }
 
@@ -133,6 +99,27 @@ std::unique_ptr<Player> selectPlayerMode(bool isWhite) {
 	}
 }
 
+void saveGameToFile(const std::vector<std::string>& moves, const std::string& filename) {
+	std::ofstream outFile(filename);
+
+	if (!outFile.is_open()) {
+		std::cerr << "Error: Unable to open file " << filename << " for writing." << std::endl;
+		return;
+	}
+	printf("Saving game to %s\n", filename.c_str());
+	for (size_t i = 0; i < moves.size(); i += 2) {
+		outFile << (i / 2 + 1) << ". "; 
+		outFile << moves[i];           
+		if (i + 1 < moves.size()) {
+			outFile << " " << moves[i + 1]; 
+		}
+		outFile << "\n"; 
+	}
+
+	outFile.close();
+	std::cout << "Game saved to " << filename << std::endl;
+}
+
 
 void PrintMoveInfo(uint32_t move)
 {
@@ -152,102 +139,21 @@ void UpdateBoard(treeNode* root, uint32_t& playerPieces, uint32_t& opponentPiece
 	promotedPiecesOpposite = reverseBits(promotedPieces);
 }
 
-int main()
+
+
+int main(int argc, char* argv[])
 {
+	std::string outputFile = "";
+	if (argc > 2)
+	{
+		printf("Usage: %s [filename]\n", argv[0]);
+		return 0;
+	}
+	else if (argc == 2)
+	{
+		outputFile = argv[1];
+	}
 	srand(time(NULL));
-
-	/*uint32_t pl = 0;
-	uint32_t opp = 0;
-	uint32_t prom = 0;
-	SET_BIT(pl, 4, 1);
-	SET_BIT(pl, 12, 1);
-	SET_BIT(pl, 18, 1);
-	SET_BIT(pl, 19, 1);
-	SET_BIT(pl, 20, 1);
-	SET_BIT(pl, 22, 1);
-	SET_BIT(pl, 24, 1);
-	SET_BIT(pl, 26, 1);
-
-	SET_BIT(opp, 0, 1);
-	SET_BIT(opp, 9, 1);
-	SET_BIT(opp, 10, 1);
-	SET_BIT(opp, 11, 1);
-	SET_BIT(opp, 13, 1);
-	SET_BIT(opp, 17, 1);
-	//SET_BIT(opp, 21, 1);
-	PlayerCPU testPlayer(true, 1000, 500);
-	testPlayer.root->playerPieces = pl;
-	testPlayer.root->opponentPieces = opp;
-	testPlayer.root->promotedPieces = prom;
-	testPlayer.root->nonAdvancingMoves = 0;
-	testPlayer.MakeBestMove();
-	printBoard(testPlayer.root->playerPieces, testPlayer.root->opponentPieces, testPlayer.root->promotedPieces, false);*/
-
-
-	/*CUDA_Vector<pair<uint32_t, string>> moves = GeneratePossibleMovesWithNotation(pl, opp, prom, true);
-	printBoard(pl, opp, prom, true);
-	for (auto m : moves)
-	{
-		cout << m.second << std::endl;
-		//for (int i = 0; i < 32; i++)
-			//if (BIT(m.first, i))
-				//cout << i << " ";
-		//cout << std::endl;
-	}*/
-	/*treeNode* root = new treeNode();
-	GenerateChildren(root);
-	for (auto c : root->children)
-	{
-		printBoard(c->playerPieces, c->opponentPieces, c->promotedPieces, false);
-	}*/
-	/*uint32_t tmpPlayer, tmpPromoted, tmpOpponent;
-	vector<uint32_t> availableMoves;
-	uint32_t move;
-	Player player(true, 10000, 500);
-	while (true)
-	{
-		if (!player.MakeBestMove())
-		{
-			;
-			cout << "YOU WIN";
-			break;
-		}
-		if (player.root->nonAdvancingMoves >= 10)
-		{
-			cout << "DRAW - 10 non advancing moves";
-			break;
-		}
-		printBoard(player.root->playerPieces, player.root->opponentPieces, player.root->promotedPieces, false);
-		availableMoves = GeneratePossibleMoves(player.root->playerPieces, player.root->opponentPieces, player.root->promotedPieces);
-		//for (auto m : availableMoves)
-		//	PrintMoveInfo(m);
-		if (availableMoves.size() == 0)
-		{
-			cout << "YOU LOSE";
-			break;
-		}
-		do
-		{
-			move = InputMove(player.root->playerPieces, player.root->opponentPieces, player.root->promotedPieces,true);
-			//PrintMoveInfo(move);
-
-		} while (find(availableMoves.begin(), availableMoves.end(), move) == availableMoves.end());
-		tmpPlayer = player.root->playerPieces;
-		tmpOpponent = player.root->opponentPieces;
-		tmpPromoted = player.root->promotedPieces;
-		MakeMove(tmpPlayer, tmpOpponent, tmpPromoted, move);
-		printBoard(tmpPlayer, tmpOpponent, tmpPromoted, false);
-		tmpPlayer = REVERSE_BITS(tmpPlayer);
-		tmpOpponent = REVERSE_BITS(tmpOpponent);
-		tmpPromoted = REVERSE_BITS(tmpPromoted);
-		player.UpdateRoot(tmpOpponent, tmpPlayer, tmpPromoted);
-		if (player.root->nonAdvancingMoves >= 10)
-		{
-			cout << "DRAW - 10 non advancing moves";
-			break;
-		}
-
-	}*/
 
 	uint32_t whitePieces = PLAYER_PIECES_INIT;
 	uint32_t blackPieces = OPPONENT_PIECES_INIT;
@@ -256,147 +162,173 @@ int main()
 	uint32_t whitePiecesOpposite = OPPONENT_PIECES_INIT;
 	uint32_t blackPiecesOpposite = PLAYER_PIECES_INIT;
 	uint32_t promotedPiecesOpposite = 0;
-	CUDA_Vector<uint32_t> availableMoves;
+	CUDA_Vector<std::pair<uint32_t,std::string>> availableMoves;
 	uint32_t move;
+	std::string move_str;
+	std::vector<std::string> gameNotation;
 	int moveCounter = 1;
 	int nonAdvancingMoveCounter = 0;
-	auto whitePlayer = selectPlayerMode(true);
-	auto blackPlayer = selectPlayerMode(false);
-
-	std::cout << "GAME START" << std::endl;
-	if (!blackPlayer && whitePlayer)
-		printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
-	else
-		printBoard(whitePieces, blackPieces, promotedPieces);
-
-	while (true)
+	std::unique_ptr<Player> whitePlayer;
+	std::unique_ptr<Player> blackPlayer;
+	try
 	{
-		std::cout << "MOVE " << moveCounter++ << ":" << std::endl;
-		std::cout << "WHITE TO MOVE" << std::endl;
-		if (whitePlayer)
-		{
-			if (!(whitePlayer->MakeBestMove()))
-			{
-				std::cout << "WHITE HAS NO MOVES LEFT" << std::endl;
-				std::cout << "BLACK WINS!" << std::endl;
-				break;
-			}
-			nonAdvancingMoveCounter = whitePlayer->root->nonAdvancingMoves;
-			std::cout << "Non advancing moves: " << nonAdvancingMoveCounter << std::endl;
+		whitePlayer = selectPlayerMode(true);
+		blackPlayer = selectPlayerMode(false);
 
-			UpdateBoard(whitePlayer->root, blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, blackPieces, whitePieces, promotedPieces);
-
-			if (blackPlayer)
-			{
-				blackPlayer->UpdateRoot(whitePlayer->root->playerPieces, whitePlayer->root->opponentPieces, whitePlayer->root->promotedPieces);
-				printBoard(whitePieces, blackPieces, promotedPieces);
-			}
-			else
-			{
-				printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
-			}
-			if (nonAdvancingMoveCounter >= 10)
-			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
-			}
-		}
+		printf("GAME START\n");
+		if (!blackPlayer && whitePlayer)
+			printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
 		else
+			printBoard(whitePieces, blackPieces, promotedPieces);
+
+		while (true)
 		{
-			availableMoves = GeneratePossibleMoves(whitePieces, blackPieces, promotedPieces);
-			if (availableMoves.size() == 0)
+			printf("MOVE %d:\n", moveCounter++);
+			printf("WHITE TO MOVE\n");
+			if (whitePlayer)
 			{
-				std::cout << "WHITE HAS NO MOVES LEFT" << std::endl;
-				std::cout << "BLACK WINS!" << std::endl;
-				break;
+				auto start = std::chrono::high_resolution_clock::now();
+				move_str = whitePlayer->MakeBestMove();
+				auto end = std::chrono::high_resolution_clock::now();
+				printf("Move computing time: %lld ms\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+				if (move_str == "")
+				{
+					printf("WHITE HAS NO MOVES LEFT\n");
+					printf("BLACK WINS!\n");
+					break;
+				}
+				gameNotation.push_back(move_str);
+				nonAdvancingMoveCounter = whitePlayer->root->nonAdvancingMoves;
+				printf("Non advancing moves: %d\n", nonAdvancingMoveCounter);
+
+				UpdateBoard(whitePlayer->root, blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, blackPieces, whitePieces, promotedPieces);
+
+				if (blackPlayer)
+				{
+					blackPlayer->UpdateRoot(whitePlayer->root->playerPieces, whitePlayer->root->opponentPieces, whitePlayer->root->promotedPieces);
+					printBoard(whitePieces, blackPieces, promotedPieces);
+				}
+				else
+				{
+					printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
+				}
+				if (nonAdvancingMoveCounter >= MAX_NON_ADVANCING_MOVES)
+				{
+					printf("DRAW - %d MOVES WITHOUT CAPTURES OR PAWNS ADVANCING\n", MAX_NON_ADVANCING_MOVES);
+					break;
+				}
 			}
-			do
-			{
-				move = InputMove(whitePieces, blackPieces, promotedPieces);
-			} while (std::find(availableMoves.begin(), availableMoves.end(), move) == availableMoves.end());
-			if (MakeMove(whitePieces, blackPieces, promotedPieces, move))
-				nonAdvancingMoveCounter = 0;
 			else
-				nonAdvancingMoveCounter++;
-			blackPiecesOpposite = reverseBits(blackPieces);
-			whitePiecesOpposite = reverseBits(whitePieces);
-			promotedPiecesOpposite = reverseBits(promotedPieces);
+			{
+				availableMoves = GeneratePossibleMovesWithNotation(whitePieces, blackPieces, promotedPieces, true);
+				if (availableMoves.size() == 0)
+				{
+					printf("WHITE HAS NO MOVES LEFT\n");
+					printf("BLACK WINS!\n");
+					break;
+				}
+
+				std::pair<uint32_t,std::string> new_move = InputMove(availableMoves);
+				move = new_move.first;
+				if (MakeMove(whitePieces, blackPieces, promotedPieces, move))
+					nonAdvancingMoveCounter = 0;
+				else
+					nonAdvancingMoveCounter++;
+				gameNotation.push_back(new_move.second);
+				blackPiecesOpposite = reverseBits(blackPieces);
+				whitePiecesOpposite = reverseBits(whitePieces);
+				promotedPiecesOpposite = reverseBits(promotedPieces);
+				if (blackPlayer)
+					printBoard(whitePieces, blackPieces, promotedPieces);
+				else
+					printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
+				if (nonAdvancingMoveCounter >= MAX_NON_ADVANCING_MOVES)
+				{
+					printf("DRAW - %d MOVES WITHOUT CAPTURES OR PAWNS ADVANCING\n", MAX_NON_ADVANCING_MOVES);
+					break;
+				}
+				if (blackPlayer)
+					blackPlayer->UpdateRoot(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite);
+			}
+			printf("BLACK TO MOVE\n");
+
 			if (blackPlayer)
-				printBoard(whitePieces, blackPieces, promotedPieces);
-			else
-				printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
-			if (nonAdvancingMoveCounter >= 10)
 			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
+				auto start = std::chrono::high_resolution_clock::now();
+				move_str = blackPlayer->MakeBestMove();
+				auto end = std::chrono::high_resolution_clock::now();
+				printf("Move computing time: %lld ms\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+				if (move_str == "")
+				{
+					printf("BLACK HAS NO MOVES LEFT\n");
+					printf("WHITE WINS!\n");
+					break;
+				}
+				gameNotation.push_back(move_str);
+				nonAdvancingMoveCounter = blackPlayer->root->nonAdvancingMoves;
+				printf("Non advancing moves: %d\n", nonAdvancingMoveCounter);
+
+				UpdateBoard(blackPlayer->root, whitePieces, blackPieces, promotedPieces, whitePiecesOpposite, blackPiecesOpposite, promotedPiecesOpposite);
+				if (whitePlayer)
+				{
+					whitePlayer->UpdateRoot(blackPlayer->root->playerPieces, blackPlayer->root->opponentPieces, blackPlayer->root->promotedPieces);
+					printBoard(whitePieces, blackPieces, promotedPieces);
+				}
+				else
+				{
+					printBoard(whitePieces, blackPieces, promotedPieces);
+				}
+				if (nonAdvancingMoveCounter >= MAX_NON_ADVANCING_MOVES)
+				{
+					printf("DRAW - %d MOVES WITHOUT CAPTURES OR PAWNS ADVANCING\n", MAX_NON_ADVANCING_MOVES);
+					break;
+				}
 			}
-			if (blackPlayer)
-				blackPlayer->UpdateRoot(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite);
+			else
+			{
+				availableMoves = GeneratePossibleMovesWithNotation(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite,false);
+				if (availableMoves.size() == 0)
+				{
+					printf("BLACK HAS NO MOVES LEFT\n");
+					printf("WHITE WINS!\n");
+					break;
+				}
+				std::pair<uint32_t, std::string> new_move = InputMove(availableMoves);
+				move = new_move.first;
+				if (MakeMove(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, move))
+					nonAdvancingMoveCounter = 0;
+				else
+					nonAdvancingMoveCounter++;
+				gameNotation.push_back(new_move.second);
+				blackPieces = reverseBits(blackPiecesOpposite);
+				whitePieces = reverseBits(whitePiecesOpposite);
+				promotedPieces = reverseBits(promotedPiecesOpposite);
+				if (whitePlayer)
+					printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
+				else
+					printBoard(whitePieces, blackPieces, promotedPieces);
+				if (nonAdvancingMoveCounter >= MAX_NON_ADVANCING_MOVES)
+				{
+					printf("DRAW - %d MOVES WITHOUT CAPTURES OR PAWNS ADVANCING\n", MAX_NON_ADVANCING_MOVES);
+					break;
+				}
+				if (whitePlayer)
+					whitePlayer->UpdateRoot(whitePieces, blackPieces, promotedPieces);
+			}
+
 		}
-
-		std::cout << "BLACK TO MOVE" << std::endl;
-
-		if (blackPlayer)
-		{
-			if (!(blackPlayer->MakeBestMove()))
-			{
-				std::cout << "BLACK HAS NO MOVES LEFT" << std::endl;
-				std::cout << "WHITE WINS!" << std::endl;
-				break;
-			}
-			nonAdvancingMoveCounter = blackPlayer->root->nonAdvancingMoves;
-			std::cout << "Non advancing moves: " << nonAdvancingMoveCounter << std::endl;
-
-			UpdateBoard(blackPlayer->root, whitePieces, blackPieces, promotedPieces, whitePiecesOpposite, blackPiecesOpposite, promotedPiecesOpposite);
-			if (whitePlayer)
-			{
-				whitePlayer->UpdateRoot(blackPlayer->root->playerPieces, blackPlayer->root->opponentPieces, blackPlayer->root->promotedPieces);
-				printBoard(whitePieces, blackPieces, promotedPieces);
-			}
-			else
-			{
-				printBoard(whitePieces, blackPieces, promotedPieces);
-			}
-			if (nonAdvancingMoveCounter >= 10)
-			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
-			}
-		}
-		else
-		{
-			availableMoves = GeneratePossibleMoves(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite);
-			if (availableMoves.size() == 0)
-			{
-				std::cout << "BLACK HAS NO MOVES LEFT" << std::endl;
-				std::cout << "WHITE WINS!" << std::endl;
-				break;
-			}
-			do
-			{
-				move = InputMove(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, true);
-			} while (std::find(availableMoves.begin(), availableMoves.end(), move) == availableMoves.end());
-			if (MakeMove(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, move))
-				nonAdvancingMoveCounter = 0;
-			else
-				nonAdvancingMoveCounter++;
-			blackPieces = reverseBits(blackPiecesOpposite);
-			whitePieces = reverseBits(whitePiecesOpposite);
-			promotedPieces = reverseBits(promotedPiecesOpposite);
-			if (whitePlayer)
-				printBoard(blackPiecesOpposite, whitePiecesOpposite, promotedPiecesOpposite, false);
-			else
-				printBoard(whitePieces, blackPieces, promotedPieces);
-			if (nonAdvancingMoveCounter >= 10)
-			{
-				std::cout << "DRAW - 10 MOVES WITHOUT CAPTURES OR PAWNS ADVANCING" << std::endl;
-				break;
-			}
-			if (whitePlayer)
-				whitePlayer->UpdateRoot(whitePieces, blackPieces, promotedPieces);
-		}
-
 	}
+	catch (const std::exception& e)
+	{
+		std::cout << "Error: " << e.what() << std::endl;
+		if (whitePlayer)
+			whitePlayer.reset();
+		if(blackPlayer)
+			blackPlayer.reset();
+	}
+
+	if (outputFile != "")
+		saveGameToFile(gameNotation, outputFile);
 
 	return 0;
 }

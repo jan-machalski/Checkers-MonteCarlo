@@ -33,6 +33,7 @@
 #define PROMOTION_SQUARES 0x0000000F
 #define PLAYER_PIECES_INIT 0xFFF00000
 #define OPPONENT_PIECES_INIT 0x00000FFF
+#define MAX_NON_ADVANCING_MOVES 10
 
 
 struct treeNode {
@@ -356,54 +357,56 @@ __host__ __device__ CUDA_Vector<uint32_t> GeneratePossibleMoves(uint32_t playerP
 
 }
 
-void printBoard(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces, bool whitePlayer = true)
-{
-	std::string columns = " | A| B| C| D| E| F| G| H| ";
+void printBoard(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces, bool whitePlayer = true) {
+	char columns[] = " | A| B| C| D| E| F| G| H| ";
 	if (!whitePlayer)
-		reverse(columns.begin(), columns.end());
-	std::string separator = "-+--+--+--+--+--+--+--+--+-";
-	std::cout << std::endl;
-	std::cout << '\t' << columns << std::endl;
-	std::cout << '\t' << separator << std::endl;
+		std::reverse(std::begin(columns), std::end(columns)-1); 
+	const char* separator = "-+--+--+--+--+--+--+--+--+-";
 
-	for (int i = 0; i < 8; i++)
-	{
-		std::cout << '\t' << (char)(whitePlayer ? 7 - i + 49 : i + 49) << '|';
+	printf("\n\t%s\n", columns);
+	printf("\t%s\n", separator);
 
-		for (int j = 0; j < 4; j++)
-		{
-			if (i % 2 == 0)
-				std::cout << "  |";
-			if (playerPieces & (1 << (i * 4 + j)))
-			{
-				std::cout << (whitePlayer ? 'W' : 'B');
-				if (promotedPieces & (1 << (i * 4 + j)))
-					std::cout << (whitePlayer ? 'W' : 'B');
-				else
-					std::cout << ' ';
+	for (int i = 0; i < 8; i++) {
+		printf("\t%c|", whitePlayer ? '8' - i : '1' + i);
+
+		for (int j = 0; j < 4; j++) {
+			if (i % 2 == 0) {
+				printf("  |");
 			}
-			else if (opponentPieces & (1 << (i * 4 + j)))
-			{
-				std::cout << (whitePlayer ? 'B' : 'W');
-				if (promotedPieces & (1 << (i * 4 + j)))
-					std::cout << (whitePlayer ? 'B' : 'W');
+
+			int position = i * 4 + j;
+
+			if (playerPieces & (1 << position)) {
+				printf("%c", whitePlayer ? 'W' : 'B');
+				if (promotedPieces & (1 << position))
+					printf("%c", whitePlayer ? 'W' : 'B');
 				else
-					std::cout << ' ';
+					printf(" ");
 			}
-			else
-				std::cout << "  ";
-			if (i % 2 == 0)
-				std::cout << '|';
-			else
-				std::cout << "|  |";
+			else if (opponentPieces & (1 << position)) {
+				printf("%c", whitePlayer ? 'B' : 'W');
+				if (promotedPieces & (1 << position))
+					printf("%c", whitePlayer ? 'B' : 'W');
+				else
+					printf(" ");
+			}
+			else {
+				printf("  ");
+			}
+
+			if (i % 2 == 0) {
+				printf("|");
+			}
+			else {
+				printf("|  |");
+			}
 		}
 
-		std::cout << (char)(whitePlayer ? 7 - i + 49 : i + 49) << std::endl;
-		std::cout << '\t' << separator << std::endl;
+		printf("%c\n", whitePlayer ? '8' - i : '1' + i);
+		printf("\t%s\n", separator);
 	}
 
-	std::cout << '\t' << columns << std::endl;
-	std::cout << '\t' << std::endl;
+	printf("\t%s\n\n", columns);
 }
 
 
@@ -455,7 +458,7 @@ uint8_t SimulateFromNode(uint32_t playerPieces, uint32_t oppoentPieces, uint32_t
 	int i = 0;
 	while (true)
 	{
-		if (nonAdvancingMoves > 10)
+		if (nonAdvancingMoves > MAX_NON_ADVANCING_MOVES)
 			return 1;
 		i++;
 
@@ -471,7 +474,7 @@ uint8_t SimulateFromNode(uint32_t playerPieces, uint32_t oppoentPieces, uint32_t
 		else
 			nonAdvancingMoves++;
 
-		if (nonAdvancingMoves > 10)
+		if (nonAdvancingMoves > MAX_NON_ADVANCING_MOVES)
 			return 1;
 
 		playerPieces = REVERSE_BITS(playerPieces);
