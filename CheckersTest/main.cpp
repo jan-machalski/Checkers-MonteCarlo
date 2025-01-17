@@ -8,7 +8,6 @@ std::pair<uint32_t,std::string> InputMove(CUDA_Vector<std::pair<uint32_t,std::st
 	std::string move;
 	do
 	{
-		std::string move;
 		std::cout << "Input your move (e.g a4-b5 or d2:f4:d6)" << std::endl;
 		std::cin >> move; 
 		for (auto p : availableMoves)
