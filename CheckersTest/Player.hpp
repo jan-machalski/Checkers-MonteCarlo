@@ -10,7 +10,7 @@ class Player
 {
 public:
 	const uint32_t timePerMove;
-	const uint32_t simulationsPerIteration;
+	uint32_t simulationsPerIteration;
 	const bool isWhite;
 	struct treeNode* root;
 
@@ -86,14 +86,14 @@ public:
 			BackPropagation(next);
 		}
 	}
-	std::string MakeBestMove()
+	std::pair<std::string,bool> MakeBestMove()
 	{
 		PerformMC();
 		printf("Total simulations from current root: %llu\n", root->gamesPlayed);
 		double evaluation = (double)root->totalPoints / root->gamesPlayed - 1;
 		printf("Evaluation: %.3f (value between -1 and 1, more = better situation)\n", evaluation);
 		if (root->children.size() == 0)
-			return false;
+			return std::make_pair("",false);
 		treeNode* bestChild = nullptr;
 		uint64_t maxSim = 0;
 		for (treeNode* c : root->children)
@@ -110,6 +110,7 @@ public:
 		uint32_t newPromotedPieces = reverseBits(bestChild->promotedPieces);
 		bool found = false;
 		std::string bestMove = "";
+		std::cout << "Available moves and their evaluations:" << std::endl;
 		for (auto move : availableMoves)
 		{
 			uint32_t playerTmp = root->playerPieces;
@@ -117,7 +118,6 @@ public:
 			uint32_t promotedTmp = root->promotedPieces;
 			MakeMove(playerTmp, opponentTmp, promotedTmp, move.first);
 #ifdef SHOW_EVALUATIONS
-			std::cout << "Available moves and their evaluations:" << std::endl;
 			for (auto c : root->children)
 			{
 				uint32_t playerTmp2 = reverseBits(c->opponentPieces);
@@ -134,12 +134,20 @@ public:
 			{
 				bestMove = move.second;
 				found = true;
+#ifndef SHOW_EVALUATIONS
+				break;
+#endif
 			}
 		}
-		std::cout << "Move: " << bestMove << std::endl;
+		if (found)
+		{
+			UpdateRoot(bestChild->playerPieces, bestChild->opponentPieces, bestChild->promotedPieces);
+			printf("Move: %s\n", bestMove);
+		}
 
-		UpdateRoot(bestChild->playerPieces, bestChild->opponentPieces, bestChild->promotedPieces);
-		return bestMove;
+		
+
+		return std::make_pair(bestMove,found);
 
 	}
 	void UpdateRoot(uint32_t playerPieces, uint32_t opponentPieces, uint32_t promotedPieces)

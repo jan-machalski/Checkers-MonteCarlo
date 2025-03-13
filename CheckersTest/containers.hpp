@@ -21,10 +21,6 @@ public:
         if (length < CAPACITY) {
             data[length++] = value;
         }
-        else {
-            // Obsługa błędu: przekroczenie pojemności
-            printf("Error: CUDA_Vector capacity exceeded.\n");
-        }
     }
 
     // Dostęp do elementu na indeksie
@@ -82,10 +78,6 @@ public:
             data[backIndex] = value;
             backIndex = (backIndex + 1) % CAPACITY;
             ++count;
-        }
-        else {
-            // Obsługa błędu: przekroczenie pojemności
-            printf("Error: CUDA_Queue capacity exceeded.\n");
         }
     }
 
@@ -185,12 +177,12 @@ const std::map<uint32_t, std::string>boardMapReverse = {
     {0x00200000,"f6"},
     {0x00400000,"d6"},
     {0x00800000,"b6"},
-    {0x01000000,"h7"},
-    {0x02000000,"f7"},
-    {0x04000000,"d7"},
-    {0x08000000,"b7"},
-    {0x10000000,"g8"},
-    {0x20000000,"e8"},
-    {0x40000000,"c8"},
-    {0x80000000,"a8"}
+    {0x01000000,"g7"},
+    {0x02000000,"e7"},
+    {0x04000000,"c7"},
+    {0x08000000,"a7"},
+    {0x10000000,"h8"},
+    {0x20000000,"f8"},
+    {0x40000000,"d8"},
+    {0x80000000,"b8"}
 };

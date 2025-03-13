@@ -6,8 +6,8 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#define THREADS_PER_BLOCK 128 
-#define BLOCKS 24
+/*#define THREADS_PER_BLOCK 256 
+#define BLOCKS 12*/
 #define XORSHIFT(seed) (seed ^= (seed << 13), seed ^= (seed >> 17), seed ^= (seed << 5))
 #define XORSHIFT_LCG(seed) \
     (seed ^= (seed << 13), \
@@ -136,23 +136,44 @@ class PlayerGPU : public Player
     uint64_t* d_globalSum;
 	unsigned long seed;
 	uint8_t* h_results;
+    int threadsPerBlock;
+    int blocks;
 public:
-	PlayerGPU(bool isWhite, uint32_t timePerMove): Player(isWhite, timePerMove,THREADS_PER_BLOCK*BLOCKS),seed(time(NULL))
-	{
-		h_results = new uint8_t[THREADS_PER_BLOCK * BLOCKS];
-        if (cudaMalloc(&d_states, THREADS_PER_BLOCK * BLOCKS * sizeof(curandState_t)) != cudaSuccess) 
+	PlayerGPU(bool isWhite, uint32_t timePerMove): Player(isWhite, timePerMove,0),seed(time(NULL))
+	{     
+        cudaDeviceProp deviceProp;
+        int device;
+
+       
+        // Get the active device
+        if (cudaGetDevice(&device) != cudaSuccess)
+            throw std::runtime_error("Failed to get current device.");
+
+        // Get device properties
+        if (cudaGetDeviceProperties(&deviceProp, device) != cudaSuccess)
+            throw std::runtime_error("Failed to get device properties.");
+        threadsPerBlock = deviceProp.maxThreadsPerBlock/4;
+        int maxThreads = deviceProp.maxThreadsPerMultiProcessor * deviceProp.multiProcessorCount;
+        blocks = maxThreads / threadsPerBlock/2;
+
+        std::cout << "Using " << blocks << " blocks with " << threadsPerBlock << " threads each." << std::endl;
+
+        simulationsPerIteration = threadsPerBlock * blocks;
+        h_results = new uint8_t[simulationsPerIteration];
+
+        if (cudaMalloc(&d_states, simulationsPerIteration * sizeof(curandState_t)) != cudaSuccess)
             throw std::runtime_error("Failed to allocate memory for d_states.");
 
-		if (cudaMalloc(&d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t)) != cudaSuccess)
-			throw std::runtime_error("Failed to allocate memory for d_results.");
+        if (cudaMalloc(&d_results, simulationsPerIteration * sizeof(uint8_t)) != cudaSuccess)
+            throw std::runtime_error("Failed to allocate memory for d_results.");
 
-        if (cudaMalloc(&d_globalSum, sizeof(uint64_t)) != cudaSuccess) 
+        if (cudaMalloc(&d_globalSum, sizeof(uint64_t)) != cudaSuccess)
             throw std::runtime_error("Failed to allocate memory for d_globalSum.");
 
-        if (cudaMemset(d_globalSum, 0, sizeof(uint64_t)) != cudaSuccess) 
+        if (cudaMemset(d_globalSum, 0, sizeof(uint64_t)) != cudaSuccess)
             throw std::runtime_error("Failed to initialize d_globalSum with cudaMemset.");
 
-        if (cudaDeviceSynchronize() != cudaSuccess) 
+        if (cudaDeviceSynchronize() != cudaSuccess)
             throw std::runtime_error("Failed to synchronize device after initialization.");
 	}
     ~PlayerGPU() {
@@ -166,7 +187,7 @@ public:
 		unsigned int seed = rand();
         cudaMemset(d_globalSum, 0, sizeof(uint64_t));
 
-        SimulateFromNodeKernel << <BLOCKS, THREADS_PER_BLOCK >> > (
+        SimulateFromNodeKernel << <blocks, threadsPerBlock >> > (
             node->playerPieces,
             node->opponentPieces,
             node->promotedPieces,
@@ -186,13 +207,13 @@ public:
         if (cudaMemcpy(&h_globalSum, d_globalSum, sizeof(uint64_t), cudaMemcpyDeviceToHost) != cudaSuccess)
             throw std::runtime_error("Failed to copy d_globalSum to host memory.");
        
-        if (cudaMemcpy(h_results, d_results, THREADS_PER_BLOCK * BLOCKS * sizeof(uint8_t), cudaMemcpyDeviceToHost) != cudaSuccess)
+        if (cudaMemcpy(h_results, d_results, simulationsPerIteration * sizeof(uint8_t), cudaMemcpyDeviceToHost) != cudaSuccess)
             throw std::runtime_error("Failed to copy d_results to host memory.");
        
 
 
 		node->totalPoints += h_globalSum;
-		node->gamesPlayed += THREADS_PER_BLOCK * BLOCKS;
+		node->gamesPlayed += simulationsPerIteration;
 	}
 };
 

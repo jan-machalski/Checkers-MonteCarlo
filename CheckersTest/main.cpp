@@ -154,6 +154,8 @@ int main(int argc, char* argv[])
 	}
 	srand(time(NULL));
 
+	printf("Checkers, author: Jan Machalski\n");
+
 	uint32_t whitePieces = PLAYER_PIECES_INIT;
 	uint32_t blackPieces = OPPONENT_PIECES_INIT;
 
@@ -163,7 +165,7 @@ int main(int argc, char* argv[])
 	uint32_t promotedPiecesOpposite = 0;
 	CUDA_Vector<std::pair<uint32_t,std::string>> availableMoves;
 	uint32_t move;
-	std::string move_str;
+	std::pair<std::string,bool> move_pair;
 	std::vector<std::string> gameNotation;
 	int moveCounter = 1;
 	int nonAdvancingMoveCounter = 0;
@@ -180,6 +182,7 @@ int main(int argc, char* argv[])
 		else
 			printBoard(whitePieces, blackPieces, promotedPieces);
 
+
 		while (true)
 		{
 			printf("MOVE %d:\n", moveCounter++);
@@ -187,16 +190,16 @@ int main(int argc, char* argv[])
 			if (whitePlayer)
 			{
 				auto start = std::chrono::high_resolution_clock::now();
-				move_str = whitePlayer->MakeBestMove();
+				move_pair = whitePlayer->MakeBestMove();
 				auto end = std::chrono::high_resolution_clock::now();
 				printf("Move computing time: %lld ms\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
-				if (move_str == "")
+				if (!move_pair.second)
 				{
 					printf("WHITE HAS NO MOVES LEFT\n");
 					printf("BLACK WINS!\n");
 					break;
 				}
-				gameNotation.push_back(move_str);
+				gameNotation.push_back(move_pair.first);
 				nonAdvancingMoveCounter = whitePlayer->root->nonAdvancingMoves;
 				printf("Non advancing moves: %d\n", nonAdvancingMoveCounter);
 
@@ -254,16 +257,16 @@ int main(int argc, char* argv[])
 			if (blackPlayer)
 			{
 				auto start = std::chrono::high_resolution_clock::now();
-				move_str = blackPlayer->MakeBestMove();
+				move_pair = blackPlayer->MakeBestMove();
 				auto end = std::chrono::high_resolution_clock::now();
 				printf("Move computing time: %lld ms\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
-				if (move_str == "")
+				if (!move_pair.second)
 				{
 					printf("BLACK HAS NO MOVES LEFT\n");
 					printf("WHITE WINS!\n");
 					break;
 				}
-				gameNotation.push_back(move_str);
+				gameNotation.push_back(move_pair.first);
 				nonAdvancingMoveCounter = blackPlayer->root->nonAdvancingMoves;
 				printf("Non advancing moves: %d\n", nonAdvancingMoveCounter);
 
@@ -326,7 +329,7 @@ int main(int argc, char* argv[])
 			blackPlayer.reset();
 	}
 
-	if (outputFile != "")
+	if (argc==2)
 		saveGameToFile(gameNotation, outputFile);
 
 	return 0;
